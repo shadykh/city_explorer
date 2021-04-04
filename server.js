@@ -81,6 +81,34 @@ function Location(weatherData) {
 Location.all = [];
 
 
+
+server.get('*', (req, res) => {
+
+    /*  {
+         status: 500,
+         responseText: "Sorry, something went wrong",
+         ...
+       } */
+
+    let err500 = handelError();
+
+    res.send(err500)
+})
+
+
+function handelError() {
+
+    let errObj = {
+        'status': 500,
+        'responseText': 'Sorry, something went wrong'
+    };
+
+    return errObj;
+}
+
+
+
+
 server.listen(PORT, () => {
     console.log(`Listening on PORT ${PORT}`)
 })
