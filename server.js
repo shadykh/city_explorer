@@ -6,54 +6,94 @@ require('dotenv').config();
 
 const cors = require('cors');
 
+const superagent = require('superagent');
+
 const server = express();
 
 const PORT = process.env.PORT || 5330;
 
+
+
+// Routes
+
 server.use(cors());
 
-server.get('/', (req, res) => {
+server.get('/', homePageFun);
+
+server.get('/location', locationPageFun);
+
+server.get('/weather', weatherPageFun);
+
+server.get('*', missPathFun);
+
+
+
+// Routes-Functions
+
+function homePageFun(req, res) {
     res.send('Welcome to the Main')
-})
+};
 
 
-server.get('/location', (req, res) => {
 
-    let locationData = require('./data/location.json');
+function locationPageFun(req, res) {
 
-    let renderedLocationData = new Location(locationData);
+    let cityVar = req.query.city;
 
-    res.send(renderedLocationData);
-})
+    let keyVal = process.env.LOCATION_KEY;
+
+    let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${keyVal}&q=${cityVar}&format=json`;
+
+    superagent.get(LocationURL)
+        .then(LocationData => {
+            let locData = LocationData.body;
+
+            const newlocationData = new Location(cityName, locData);
+
+            res.send(newlocationData);
+
+        })
+
+        .catch(error => {
+            console.log('inside superagent');
+            console.log('Error in getting data from LocationIQ server')
+            console.error(error);
+            res.send(error);
+        })
+};
 
 
-function Location(locationData) {
 
-    /*  {
-         "search_query": "seattle",
-         "formatted_query": "Seattle, WA, USA",
-         "latitude": "47.606210",
-         "longitude": "-122.332071"
-       } */
-    let idx = 0;
+function weatherPageFun(req, res) {
 
-    this.search_query = 'Lynnwood';
-    this.formatted_query = locationData[idx].display_name;
-    this.latitude = locationData[idx].lat;
-    this.longitude = locationData[idx].lon;
+    let weatherData = require('./data/weather.json');
+    let data = weatherData.data.map(value => {
+        let renderedWeatherData = new Location(value);
+        return renderedWeatherData;
+    });
+
+    res.send(data);
+};
+
+
+
+function Location(cityName, locData) {
+
+    /*     {
+            "search_query": "seattle",
+            "formatted_query": "Seattle, WA, USA",
+            "latitude": "47.606210",
+            "longitude": "-122.332071"
+        } */
+
+    this.search_query = cityName;
+    this.formatted_query = locData[0].display_name;
+    this.latitude = locData[0].lat;
+    this.longitude = locData[0].lon;
 
 }
 
 
-server.get('/weather', (req, res) => {
-
-    let weatherData = require('./data/weather.json');
-    weatherData.data.forEach(value => {
-        let renderedWeatherData = new Location(value);
-    });
-
-    res.send(Location.all);
-})
 
 
 function Location(weatherData) {
@@ -82,7 +122,7 @@ Location.all = [];
 
 
 
-server.get('*', (req, res) => {
+function missPathFun(req, res) {
 
     /*  {
          status: 500,
@@ -93,7 +133,7 @@ server.get('*', (req, res) => {
     let err500 = handelError();
 
     res.send(err500)
-})
+};
 
 
 function handelError() {
