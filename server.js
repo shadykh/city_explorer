@@ -8,9 +8,14 @@ const cors = require('cors');
 
 const superagent = require('superagent');
 
+const pg = require('pg');
+
 const server = express();
 
 const PORT = process.env.PORT || 5330;
+
+//const client = new pg.Client(process.env.DATABASE_URL);
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 
 
@@ -20,7 +25,7 @@ server.use(cors());
 
 server.get('/', homePageFun);
 
-server.get('/location', locationPageFun);
+server.get('/location', checkDataBase);
 
 server.get('/weather', weatherPageFun);
 
@@ -37,11 +42,48 @@ function homePageFun(req, res) {
 };
 
 
-//http://localhost:4420/location?city=amman
-
-function locationPageFun(req, res) {
+function checkDataBase(req, res) {
 
     let cityVar = req.query.city;
+
+    let SQL = `SELECT * FROM cities WHERE search_query = '${cityVar}'`
+
+    client.query(SQL)
+        .then(result => {
+            if (result.rows.length !== 0) {
+                res.send(result.rows[0])
+            }
+        })
+    client.query(SQL)
+        .then(result => {
+            if (result.rows.length === 0) {
+                let data = locationPageFun(cityVar);
+                res.send(data);
+            }
+        })
+        .catch(error => {
+            res.send(error);
+        })
+}
+
+
+function bulidData(data) {
+    let search_query = data.search_query;
+    let formatted_query = data.formatted_query;
+    let latitude = data.latitude;
+    let longitude = data.longitude;
+    let SQL = `INSERT INTO cities (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);`;
+    let safeValues = [search_query, formatted_query, latitude, longitude];
+    client.query(SQL, safeValues);
+}
+
+
+
+//http://localhost:4420/location?city=amman
+
+function locationPageFun(city) {
+
+    let cityVar = city;
 
     let keyVal = process.env.LOCATION_KEY;
 
@@ -51,18 +93,11 @@ function locationPageFun(req, res) {
         .then(locationData => {
 
             let locData = locationData.body;
-
             const newLocationData = new Location(cityVar, locData);
-
-            res.send(newLocationData);
-
+            let data = bulidData(newLocationData);
+            return data;
         })
 
-        .catch(error => {
-            console.log('Error in getting data from LocationIQ server')
-            console.error(error);
-            res.send(error);
-        })
 };
 
 
@@ -239,6 +274,10 @@ function handelError() {
 
 
 
-server.listen(PORT, () => {
-    console.log(`Listening on PORT ${PORT}`)
-})
+client.connect()
+    .then(() => {
+        server.listen(PORT, () => {
+            console.log(`Listening on PORT ${PORT}`)
+        })
+    })
+
