@@ -10,6 +10,8 @@ const superagent = require('superagent');
 
 const pg = require('pg');
 
+const axios = require("axios");
+
 const server = express();
 
 const PORT = process.env.PORT || 5330;
@@ -183,8 +185,6 @@ function moviesPageFun(req, res) {
         .then(moviesData => {
 
             let movieData = moviesData.body.results;
-            //console.log(movieData);
-            console.log(movieData, 'hi');
             let data = movieData.map(val => {
                 console.log(val, 'but');
                 const newMoviesData = new Movie(val);
@@ -204,23 +204,24 @@ function moviesPageFun(req, res) {
 
 };
 
+// http://localhost:4420/yelp?search_query=seattle&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.60383210000000&longitude=-122.33006240000000&page=1
 
 function yelpPageFun(req, res) {
 
     let cityVar = req.query.search_query;
 
-    let keyVal = process.env.PARKS_KEY;
+    let keyVal = process.env.YELP_API_KEY;
 
-    let parksURL = `https://developer.nps.gov/api/v1/parks?q=${cityVar}&limit=10&api_key=${keyVal}`;
+    const yelpUrl = `https://api.yelp.com/v3/businesses/search?location=${cityVar}`;
 
-    superagent.get(parksURL)
-        .then(parksData => {
+    superagent.get(yelpUrl)
+        .set('Authorization', `Bearer ${keyVal}`)
+        .then(yelpData => {
 
-
-            let parkData = parksData.body;
-            let data = parkData.data.map(val => {
-                const newParksData = new Park(val);
-                return newParksData
+            let yelData = yelpData.body;
+            let data = yelData.businesses.map(val => {
+                const newYelpData = new Yelp(val);
+                return newYelpData;
             })
 
 
@@ -349,9 +350,40 @@ function Movie(moviesData) {
 
     this.popularity = moviesData.popularity;
 
-    this.released_on = moviesData.release_date
+    this.released_on = moviesData.release_date;
 
-    console.log(this.title, this.overview, this.average_votes, this.total_votes, this.image_url, this.popularity, this.released_on);
+}
+
+
+
+function Yelp(yelpData) {
+
+    /* [
+  {
+    "name": "Pike Place Chowder",
+    "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/ijju-wYoRAxWjHPTCxyQGQ/o.jpg",
+    "price": "$$   ",
+    "rating": "4.5",
+    "url": "https://www.yelp.com/biz/pike-place-chowder-seattle?adjust_creative=uK0rfzqjBmWNj6-d3ujNVA&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=uK0rfzqjBmWNj6-d3ujNVA"
+  },
+  {
+    "name": "Umi Sake House",
+    "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/c-XwgpadB530bjPUAL7oFw/o.jpg",
+    "price": "$$   ",
+    "rating": "4.0",
+    "url": "https://www.yelp.com/biz/umi-sake-house-seattle?adjust_creative=uK0rfzqjBmWNj6-d3ujNVA&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=uK0rfzqjBmWNj6-d3ujNVA"
+  },
+  ...
+] */
+    this.name = yelpData.name;
+
+    this.image_url = yelpData.image_url;
+
+    this.price = yelpData.price;
+
+    this.rating = yelpData.rating;
+
+    this.url = yelpData.url;
 }
 
 
