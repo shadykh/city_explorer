@@ -210,9 +210,15 @@ function yelpPageFun(req, res) {
 
     let cityVar = req.query.search_query;
 
+    let page = req.query.page;
+
     let keyVal = process.env.YELP_API_KEY;
 
-    const yelpUrl = `https://api.yelp.com/v3/businesses/search?location=${cityVar}`;
+    const numPerPage = 5;
+
+    const start = ((page - 1) * numPerPage + 1);
+
+    const yelpUrl = `https://api.yelp.com/v3/businesses/search?location=${cityVar}&limit=${numPerPage}&offest=${start}`;
 
     superagent.get(yelpUrl)
         .set('Authorization', `Bearer ${keyVal}`)
