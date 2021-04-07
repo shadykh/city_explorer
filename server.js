@@ -14,8 +14,8 @@ const server = express();
 
 const PORT = process.env.PORT || 5330;
 
-// const client = new pg.Client(process.env.DATABASE_URL);
-const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const client = new pg.Client(process.env.DATABASE_URL);
+//const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 
 
@@ -30,6 +30,10 @@ server.get('/location', checkDataBase);
 server.get('/weather', weatherPageFun);
 
 server.get('/parks', parksPageFun);
+
+server.get('/movies', moviesPageFun);
+
+server.get('/yelp', yelpPageFun);
 
 server.get('*', missPathFun);
 
@@ -164,7 +168,72 @@ function parksPageFun(req, res) {
         })
 };
 
+// http://localhost:4420/movies?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.95156940000000&longitude=35.92396250000000&page=1
 
+function moviesPageFun(req, res) {
+
+
+    let cityVar = req.query.search_query;
+
+    let keyVal = process.env.MOVIE_API_KEY;
+
+    let moviesURL = `https://api.themoviedb.org/3/search/movie?api_key=${keyVal}&query=${cityVar}`;
+
+    superagent.get(moviesURL)
+        .then(moviesData => {
+
+            let movieData = moviesData.body.results;
+            //console.log(movieData);
+            console.log(movieData, 'hi');
+            let data = movieData.map(val => {
+                console.log(val, 'but');
+                const newMoviesData = new Movie(val);
+                return newMoviesData
+            })
+
+            // console.log(data);
+            res.send(data);
+
+        })
+
+        .catch(error => {
+            console.log('Error in getting data from Movies server')
+            console.error(error);
+            res.send(error);
+        })
+
+};
+
+
+function yelpPageFun(req, res) {
+
+    let cityVar = req.query.search_query;
+
+    let keyVal = process.env.PARKS_KEY;
+
+    let parksURL = `https://developer.nps.gov/api/v1/parks?q=${cityVar}&limit=10&api_key=${keyVal}`;
+
+    superagent.get(parksURL)
+        .then(parksData => {
+
+
+            let parkData = parksData.body;
+            let data = parkData.data.map(val => {
+                const newParksData = new Park(val);
+                return newParksData
+            })
+
+
+            res.send(data);
+
+        })
+
+        .catch(error => {
+            console.log('Error in getting data from LocationIQ server')
+            console.error(error);
+            res.send(error);
+        })
+};
 
 
 
@@ -245,6 +314,45 @@ function Park(parkData) {
 }
 
 
+function Movie(moviesData) {
+
+    /* [
+  {
+    "title": "Sleepless in Seattle",
+    "overview": "A young boy who tries to set his dad up on a date after the death of his mother. He calls into a radio station to talk about his dad’s loneliness which soon leads the dad into meeting a Journalist Annie who flies to Seattle to write a story about the boy and his dad. Yet Annie ends up with more than just a story in this popular romantic comedy.",
+    "average_votes": "6.60",
+    "total_votes": "881",
+    "image_url": "https://image.tmdb.org/t/p/w500/afkYP15OeUOD0tFEmj6VvejuOcz.jpg",
+    "popularity": "8.2340",
+    "released_on": "1993-06-24"
+  },
+  {
+    "title": "Love Happens",
+    "overview": "Dr. Burke Ryan is a successful self-help author and motivational speaker with a secret. While he helps thousands of people cope with tragedy and personal loss, he secretly is unable to overcome the death of his late wife. It's not until Burke meets a fiercely independent florist named Eloise that he is forced to face his past and overcome his demons.",
+    "average_votes": "5.80",
+    "total_votes": "282",
+    "image_url": "https://image.tmdb.org/t/p/w500/pN51u0l8oSEsxAYiHUzzbMrMXH7.jpg",
+    "popularity": "15.7500",
+    "released_on": "2009-09-18"
+  },
+  ...
+] */
+    this.title = moviesData.title;
+
+    this.overview = moviesData.overview;
+
+    this.average_votes = moviesData.vote_average;
+
+    this.total_votes = moviesData.vote_count;
+
+    this.image_url = moviesData.poster_path;
+
+    this.popularity = moviesData.popularity;
+
+    this.released_on = moviesData.release_date
+
+    console.log(this.title, this.overview, this.average_votes, this.total_votes, this.image_url, this.popularity, this.released_on);
+}
 
 
 function missPathFun(req, res) {
