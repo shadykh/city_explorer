@@ -1,5 +1,6 @@
 'use strict';
 
+// Dependencies
 const express = require('express');
 
 require('dotenv').config();
@@ -10,11 +11,11 @@ const superagent = require('superagent');
 
 const pg = require('pg');
 
-const axios = require("axios");
-
 const server = express();
 
 const PORT = process.env.PORT || 5330;
+
+server.use(cors());
 
 //const client = new pg.Client(process.env.DATABASE_URL);
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -22,8 +23,6 @@ const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: 
 
 
 // Routes
-
-server.use(cors());
 
 server.get('/', homePageFun);
 
@@ -41,13 +40,14 @@ server.get('*', missPathFun);
 
 
 
-// Routes-Functions
+/* Routes-Functions */
 
+// Home page route
 function homePageFun(req, res) {
     res.send('Welcome to the Main')
 };
 
-
+// Function To check if the city is in the DB
 function checkDataBase(req, res) {
 
     let cityVar = req.query.city;
@@ -58,14 +58,12 @@ function checkDataBase(req, res) {
         .then(result => {
             if (result.rows.length !== 0) {
                 res.send(result.rows[0])
-            }
-        })
-    client.query(SQL)
-        .then(result => {
-            if (result.rows.length === 0) {
-                let data = locationPageFun(cityVar);
-                res.send(data);
-            }
+            } else (
+                locationPageFun(cityVar)
+                    .then(data => {
+                        res.send(data);
+                    })
+            )
         })
         .catch(error => {
             res.send(error);
@@ -73,20 +71,23 @@ function checkDataBase(req, res) {
 }
 
 
+// Function to instert data into the DB
 function bulidData(data) {
     let search_query = data.search_query;
     let formatted_query = data.formatted_query;
     let latitude = data.latitude;
     let longitude = data.longitude;
-    let SQL = `INSERT INTO cities (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);`;
+    let SQL = `INSERT INTO cities (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;`;
     let safeValues = [search_query, formatted_query, latitude, longitude];
-    client.query(SQL, safeValues);
+    return client.query(SQL, safeValues)
+        .then(result => {
+            return result.rows[0];
+        })
 }
 
 
-
-//http://localhost:4420/location?city=amman
-
+// Handle the location request 
+/* url-request -----> http://localhost:4420/location?city=amman*/
 function locationPageFun(city) {
 
     let cityVar = city;
@@ -95,20 +96,21 @@ function locationPageFun(city) {
 
     let locationURL = `https://eu1.locationiq.com/v1/search.php?key=${keyVal}&q=${cityVar}&format=json`;
 
-    superagent.get(locationURL)
+    return superagent.get(locationURL)
         .then(locationData => {
 
             let locData = locationData.body;
             const newLocationData = new Location(cityVar, locData);
-            let data = bulidData(newLocationData);
-            return data;
+            return bulidData(newLocationData)
+                .then(data => {
+                    return data;
+                })
         })
 
 };
 
-
-// http://localhost:4420/weather?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.9515694&longitude=35.9239625&page=1
-
+// Handle the weather request 
+/* url-request -----> http://localhost:4420/weather?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.9515694&longitude=35.9239625&page=1*/
 function weatherPageFun(req, res) {
 
     let cityVar = req.query.search_query;
@@ -132,14 +134,15 @@ function weatherPageFun(req, res) {
         })
 
         .catch(error => {
-            console.log('Error in getting data from LocationIQ server')
+            console.log('Error in getting data from weather server')
             console.error(error);
             res.send(error);
         })
 };
 
-// http://localhost:4420/parks?search_query=seattle%20&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.6038321&longitude=-122.3300624&page=1
 
+// Handle the parks request 
+/* url-request -----> http://localhost:4420/parks?search_query=seattle%20&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.6038321&longitude=-122.3300624&page=1 */
 function parksPageFun(req, res) {
 
     let cityVar = req.query.search_query;
@@ -164,14 +167,15 @@ function parksPageFun(req, res) {
         })
 
         .catch(error => {
-            console.log('Error in getting data from LocationIQ server')
+            console.log('Error in getting data from parks server')
             console.error(error);
             res.send(error);
         })
 };
 
-// http://localhost:4420/movies?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.95156940000000&longitude=35.92396250000000&page=1
 
+// Handle the movie request 
+/* url-request -----> http://localhost:4420/movies?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.95156940000000&longitude=35.92396250000000&page=1  */
 function moviesPageFun(req, res) {
 
 
@@ -204,8 +208,9 @@ function moviesPageFun(req, res) {
 
 };
 
-// http://localhost:4420/yelp?search_query=seattle&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.60383210000000&longitude=-122.33006240000000&page=1
 
+// Handle the yelp request 
+/* url-request -----> http://localhost:4420/yelp?search_query=seattle&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.60383210000000&longitude=-122.33006240000000&page=1  */
 function yelpPageFun(req, res) {
 
     let cityVar = req.query.search_query;
@@ -236,14 +241,14 @@ function yelpPageFun(req, res) {
         })
 
         .catch(error => {
-            console.log('Error in getting data from LocationIQ server')
+            console.log('Error in getting data from yelp server')
             console.error(error);
             res.send(error);
         })
 };
 
 
-
+// Location Constructor
 function Location(cityName, locData) {
 
     /*     {
@@ -262,7 +267,7 @@ function Location(cityName, locData) {
 
 
 
-
+// Weather Constructor
 function Weather(weatherData) {
 
     /* 
@@ -284,7 +289,7 @@ function Weather(weatherData) {
 }
 
 
-
+// Park Constructor
 function Park(parkData) {
 
     /*     [
@@ -320,7 +325,7 @@ function Park(parkData) {
     this.url = parkData.url
 }
 
-
+// Movie Constructor
 function Movie(moviesData) {
 
     /* [
@@ -361,7 +366,7 @@ function Movie(moviesData) {
 }
 
 
-
+// Yelp Constructor
 function Yelp(yelpData) {
 
     /* [
@@ -392,7 +397,7 @@ function Yelp(yelpData) {
     this.url = yelpData.url;
 }
 
-
+// Handle the missing path
 function missPathFun(req, res) {
 
     /*  {
@@ -406,7 +411,7 @@ function missPathFun(req, res) {
     res.send(err500)
 };
 
-
+// Error message for the <missPathFun> function
 function handelError() {
 
     let errObj = {
@@ -419,7 +424,7 @@ function handelError() {
 
 
 
-
+// Check if you are connect to the DB and are working on PORT
 client.connect()
     .then(() => {
         server.listen(PORT, () => {
